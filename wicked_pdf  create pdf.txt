@@ -1,0 +1,37 @@
+1.添加 gem 到 Gemfile
+gem 'wkhtmltopdf-binary' #(wicked_pdf 依赖这个 gem)
+gem 'wicked_pdf'
+
+2.终端执行 rails generate wicked_pdf,这会生成一个文件 config/initializers/wicked_pdf.rb
+
+3.config/initializers/mime_types.rb加入
+Mime::Type.register "application/pdf", :pdf
+
+4.config/initializers/wicked_pdf.rb加入
+WickedPdf.config = {
+  exe_path: '/usr/local/bin/wkhtmltopdf'
+}
+
+pdf = WickedPdf.new.pdf_from_string(
+      render_to_string(
+        template: "ancient/product_reports/_pdf.html.erb"
+      ))
+    respond_to do |format|
+      format.html
+      # format.pdf do
+      #   render pdf: "invoice.pdf", template: "ancient/product_reports/index.html.erb"
+      # end
+      format.pdf {send_data(pdf,
+            filename: '施耐德商品情况统计.pdf',
+            type: 'application/pdf',
+            disposition: 'attachment')}
+    end
+	
+	
+ubuntu 安装 wkhtmltopdf 的方法
+https://blog.csdn.net/CaoMei_HuaCha/article/details/81981252
+
+
+中文乱码问题 
+在页面加入
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />

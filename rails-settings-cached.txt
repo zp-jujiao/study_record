@@ -1,0 +1,78 @@
+Gem rails-settings-cached
+https://github.com/huacnlee/rails-settings-cached
+
+这个 Gem 是用来给 ActiveRecord 做设置项存储的，数据保存在数据库里面，读取将会有自动缓存。
+举例子：
+class Setting  < RailsSettings::CachedSettings  
+end
+
+$ rails c
+ruby> Setting.foo = "bar"
+ruby> exit
+$ rails c
+ruby> Setting.foo
+bar
+
+修改你的gemfile
+bundle add rails-settings-cached
+
+生成设置 会生成app/models/settings.rb文件
+rails g settings:install 或者 rails g settings:install AppConfig
+
+settings.rb文件：
+你必须用field声明你要使用的键
+class Setting < RailsSettings::Base
+  # cache_prefix { "v1" }
+  field :app_name, default: "Rails Settings Cache Demo"
+  field :host, default: "http://example.com"
+  field :default_locale, default: "zh-CN"
+  field :readonly_item, type: :integer, default: 100, readonly: true
+  field :user_limits, type: :integer, default: 20
+  field :exchange_rate, type: :float, default: 0.123
+  field :admin_emails, type: :array, default: %w[admin@rubyonrails.org]
+  field :captcha_enable, type: :boolean, default: true
+
+  # Override array separator, default: /[\n,]/ split with \n or comma.
+  field :tips, type: :array, separator: /[\n]+/
+
+  field :notification_options, type: :hash, default: {
+    send_all: true,
+    logging: true,
+    sender_email: "foo@bar.com"
+  }
+
+  # lambda default value
+  field :welcome_message, type: :string, default: -> { "welcome to #{self.app_name}" }
+end
+
+再rails db:migrate执行迁移
+
+
+
+如果你需要在rails初始化前使用Setting
+比如：config/devise.rb
+Devise.setup do |config|
+  if Setting.omniauth_google_client_id.present?
+    config.omniauth :google_oauth2, Setting.omniauth_google_client_id, Setting.omniauth_google_client_secret
+  end
+end
+
+那么你需要定义readonly字段 在后面加上readonly: true就可以了
+class Setting < RailsSettings::Base
+  # cache_prefix { "v1" }
+  field :omniauth_google_client_id, default: ENV["OMNIAUTH_GOOGLE_CLIENT_ID"], readonly: true
+  field :omniauth_google_client_secret, default: ENV["OMNIAUTH_GOOGLE_CLIENT_SECRET"], readonly: true
+end
+在每次键的调用都会加载缓存或者数据库的数据并保存在RequestStore中，避免碰上缓存或者数据库
+如果键发生改变就会清除缓存，因此不要频繁的修改键
+
+
+
+修改缓存键
+如果你需要强制更新缓存，你可以使用cache_prefix
+class Setting < RailsSettings::Base
+  cache_prefix { "you-prefix" }
+  ...
+end
+
+

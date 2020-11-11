@@ -1,0 +1,124 @@
+安装登录系统
+Devise 是一个 Rails 内热门的 gem，专门用来快速实作“登录系统”。在这一章我们会用 devise 实作登录功能。
+
+Gemfile添加
+gem 'devise'
+
+执行
+bundle install
+
+执行
+rails g devise:install
+rails g devise user
+rake db:migrate
+
+在 app/controllers/groups_controller.rb 加入一行 
+before_action :authenticate_user! 可以帮你做出“限制使用者必须登入”的功能。
+only:[:new]限制必须登录的action
+before_action :authenticate_user! , only: [:new]
+
+
+让网站有退出/登录的功能
+修改 app/views/common/_navbar.html.erb
+app/views/common/_navbar.html.erb
+-                <li> 
+-                  <%= link_to("登录", '#') %>   
+-                </li>
++                <% if !current_user %>
++                  <li><%= link_to("注册", new_user_registration_path) %> </li>
++                  <li><%= link_to("登录", new_user_session_path) %></li>
++                <% else %>
++                  <li class="dropdown">
++                    <a href="#" class="dropdown-toggle" data-toggle="dropdown">
++                        Hi!, <%= current_user.email %>
++                        <b class="caret"></b>
++                    </a>
++                    <ul class="dropdown-menu">
++                        <li> <%= link_to("退出", destroy_user_session_path, method: :delete) %> </li>
++                    </ul>
++                  </li>
++                <% end %>
+
+修改 app/assets/javascripts/application.js
+加入 //= require bootstrap/dropdown
+
+
+让“群组”与“使用者”产生关联 
+一个用户可以开设多个群组
+要展示出开设者的名称
+
+新增 user_id 到 group 的 table 里，执行
+rails g migration add_user_id_to_group
+
+修改db/migrate/一串数字_add_user_id_to_group
+class AddUserIdToGroup < ActiveRecord::Migration[5.0]
+  def change
+    add_column :groups, :user_id, :integer
+  end
+end
+
+
+执行
+rake db:migrate
+
+建立连结 user 与 group 的双向关系
+在models/group.rb增加
+belongs_to :user
+
+在models/user.rb中增加
+has_many :groups
+
+在新增看板时，记录谁是群组的建立者
+app/controllers/groups_controller.rb
+class GroupsController < ApplicationController
+  before_action :authenticate_user! , only: [:new, :create]
+  
+修改 app/controllers/groups_controller.rb，在 create 中，多加入一行 
+@group.user = current_user
+
+
+在新增看板时，记录谁是群组的建立者
+修改 app/views/groups/index.html.erb 然后把 Creator 的信息加进去。（代码如下）
+app/views/groups/index.html.erb
+<div class="col-md-12">
+  <div class="group">
+    <%= link_to("New group", new_group_path, class: "btn btn-primary pull-right") %>
+  </div>
+  <table class="table table-hover">
+    <thead>
+      <tr>
+        <td>#</td>
+        <td>Title</td>
+        <td>Description</td>
++       <td>Creator </td>
+      </tr>
+    </thead>
+    <tbody>
+      <% @groups.each do |group| %>
+        <tr>
+          <td>#</td>
+          <td><%= link_to(group.title, group_path(group)) %></td>
+          <td><%= group.description %></td>
++         <td> <%= group.user.email %> </td>
+          <td>
+              <%= link_to("Edit", edit_group_path(group), class: "btn btn-sm btn-default")%>
+              <%= link_to("Delete", group_path(group),    class: "btn btn-sm btn-default",
+                          method: :delete, data: { confirm: "Are you sure?" } )%>
+          </td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+</div>
+
+
+只有群组的“创始者”可以“编辑”“删除”群组资讯
+路人不应该可以看到“编辑”“删除”按钮，只能查看
+只有群组的“创始者”可以实际执行“编辑”“删除”群组资讯
+加入 <% if current_user && current_user == group.user %> 的判断式
+
+路人不应该也可以“直接输入网址”去存取 edit / update / destroy action
+我们也要在 controller 做权限判断，滤掉这种人。
+
+
+

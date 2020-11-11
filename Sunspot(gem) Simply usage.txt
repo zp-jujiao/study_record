@@ -1,0 +1,125 @@
+使用Sunspot
+
+词组搜索表示为双引号的单词组
+Post.search do
+  fulltext '"great pizza"'
+end
+
+query_phrase_slop设置短语中单词之间可能出现的单词数
+Post.search do
+  fulltext '"great pizza"' do
+    query_phrase_slop 1
+  end
+end
+
+phrase_fields :title => 2.0优先匹配title
+Post.search do
+  fulltext 'great pizza' do
+    phrase_fields :title => 2.0
+  end
+end
+
+phrase_fields :title => 2.0
+phrase_slop   1
+指定输入的内容为一个短语，当字段中都有这个短语时优先匹配title
+Post.search do
+  fulltext 'great pizza' do
+    phrase_fields :title => 2.0
+	phrase_slop   1
+  end
+end
+
+
+with(:blog_id, 1)  with类似于等于  查询blog_id=1的数据
+with(:average_rating, 3.0..5.0)  查询字段average_rating在3.0到5.0范围的数据
+with(:category_ids, [1, 3, 5])  查询字段category_ids内容为1, 3, 5中任意一个的数据
+with(:published_at).greater_than(1.week.ago)   查询字段是否大于一星期
+ 
+without(:category_ids, [1, 3])  与with相反
+
+with(:category_ids, id_list) if id_list.present?   先判断id_list是否为空
+
+
+匹配blog_id=1的，只匹配title为1的
+with(:blog_id, 1)
+field_list [:title]
+
+
+all_of和any_of可以无限层嵌套，分别代表and和or
+表示expired_at超过一星期或者expired_at为nil
+any_of do
+	with(:expired_at).greater_than(Time.now)
+    with(:expired_at, nil)
+end
+
+表示expired_at超过一星期并且expired_at为nil
+all_of do
+	with(:expired_at).greater_than(Time.now)
+    with(:expired_at, nil)
+end
+
+用两个字段中的任何一个得分
+any do
+    fulltext "keyword1", :fields => :title
+    fulltext "keyword2", :fields => :body
+end
+
+返回值下的一些方法
+search = Post.search do
+  fulltext "pizza"
+  paginate :page => 2
+end
+
+# Again, imagine there are 60 total results; this is the second page
+results = search.results # => Array with 30 Post elements
+
+search.total           # => 60
+
+results.total_pages    # => 2
+results.first_page?    # => false
+results.last_page?     # => true
+results.previous_page  # => 1
+results.next_page      # => nil
+results.out_of_bounds? # => false
+results.offset         # => 30
+
+
+突出显示您允许显示和查询匹配的文档部分的片段  必须在searchable的时候 text :body,:stored => true
+search = Post.search do
+  fulltext "pizza" do
+    highlight :body
+  end
+end
+
+Solr可以返回索引数值字段的一些统计信息。正在获取平均评等的统计信息：
+也可以指定多个字段 在后面跟 :字段名就行
+search = Post.search do
+  stats :average_rating
+end
+
+puts "Minimum average rating: #{search.stats(:average_rating).min}"
+puts "Maximum average rating: #{search.stats(:average_rating).max}"
+
+
+也可以将字段的统计信息分到另一个字段
+在stats字段上请求facet时要小心，因为所有facet结果都是由Solr返回的！
+search = Post.search do
+  stats :average_rating do
+    facet :featured
+  end
+end
+
+search.stats(:average_rating).facet(:featured).rows.each do |row|
+  puts "Minimum average rating for featured=#{row.value}: #{row.min}"
+end
+
+json方面的统计
+search = Post.search do
+  stats :average_rating do
+    json_facet :featured
+  end
+end
+
+search.json_facet_stats(:featured).rows.each do |row|
+  puts "Minimum average rating for featured=#{row.value}: #{row.min}"
+end

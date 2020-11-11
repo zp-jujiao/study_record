@@ -1,0 +1,21 @@
+@selected_catalog = Catalog.find_by_id(params[:q][:catalog_id_eq])
+@query = Product.unscoped.by_state(4).can_operate_products(current_user).order("id DESC").ransack(params[:q])
+@emall_list = redio_info(Emall, current_user.id)
+@catalog = current_user.product_audit_rules.pluck(:catalog_id).uniq
+if @catalog.include?(0) || current_user.admin?
+  catalog_id = Catalog.where({ancestry: nil}).pluck(:id)
+  select_sql = {:'top.id' => catalog_id}
+  join_sql = "INNER JOIN emalls ema ON ema.id = products.emall_id"
+else
+  select_sql = {:'rule.user_id' => current_user.id}
+  join_sql = "INNER JOIN emalls ema ON ema.id = products.emall_id INNER JOIN product_audit_rules rule ON CASE WHEN rule.emall_id IS NULL THEN 1 ELSE rule.emall_id = products.emall_id END AND rule.catalog_id = top.id"
+end
+@product = @query.result.order('products.id desc')
+.joins("INNER JOIN catalogs own ON products.catalog_id = own.id")
+.joins("INNER JOIN catalogs top ON substring_index(own.ancestry, '/', 1) = top.id")
+.joins(join_sql)
+.where(select_sql).includes(:emall).page(params[:page]).per(params[:per_page])
+respond_to do |format|
+  format.html
+  format.csv { send_data(Product.export_product_excel(@query.result.distinct), :type => "text/excel;charset=utf-8; header=present", :filename => "产品数据.xls" ) }
+end
